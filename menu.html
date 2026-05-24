@@ -47,7 +47,7 @@ Sejarah
 <a href="peta.html"
 target="kanan"
 style="color:#ffffff; text-decoration:none; font-weight:600; font-size:20px;"
-onClick="this.style.color='yellow'; setTimeout(() => this.style.color='white', 500);">
+onclick="this.style.color='yellow'; setTimeout(function(){this.style.color='white';}.bind(this),500);">
 Peta
 </a>
 </li>
@@ -57,7 +57,7 @@ Peta
 <a href="desa.html"
 target="kanan"
 style="color:#ffffff; text-decoration:none; font-weight:600; font-size:20px;"
-onClick="this.style.color='yellow'; setTimeout(() => this.style.color='white', 500);">
+onclick="this.style.color='yellow'; setTimeout(function(){this.style.color='white';}.bind(this),500);">
 Daftar Desa
 </a>
 </li>
@@ -67,7 +67,7 @@ Daftar Desa
 <a href="struktur.html"
 target="kanan"
 style="color:#ffffff; text-decoration:none; font-weight:600; font-size:20px;"
-onClick="this.style.color='yellow'; setTimeout(() => this.style.color='white', 500);">
+onclick="this.style.color='yellow'; setTimeout(function(){this.style.color='white';}.bind(this),500);">
 Struktur Organisasi
 </a>
 </li>
@@ -77,7 +77,7 @@ Struktur Organisasi
 <a href="visi.html"
 target="kanan"
 style="color:#ffffff; text-decoration:none; font-weight:600; font-size:20px;"
-onClick="this.style.color='yellow'; setTimeout(() => this.style.color='white', 500);">
+onclick="this.style.color='yellow'; setTimeout(function(){this.style.color='white';}.bind(this),500);">
 Visi Misi
 </a>
 </li>
@@ -87,7 +87,7 @@ Visi Misi
 <a href="proker.html"
 target="kanan"
 style="color:#ffffff; text-decoration:none; font-weight:600; font-size:20px;"
-onClick="this.style.color='yellow'; setTimeout(() => this.style.color='white', 500);">
+onclick="this.style.color='yellow'; setTimeout(function(){this.style.color='white';}.bind(this),500);">
 Program Kerja
 </a>
 </li>
@@ -97,7 +97,7 @@ Program Kerja
 <a href="ponomi.html"
 target="kanan"
 style="color:#ffffff; text-decoration:none; font-weight:600; font-size:20px;"
-onClick="this.style.color='yellow'; setTimeout(() => this.style.color='white', 500);">
+onclick="this.style.color='yellow'; setTimeout(function(){this.style.color='white';}.bind(this),500);">
 Potensi Ekonomi
 </a>
 </li>
@@ -117,7 +117,7 @@ Potensi Pariwisata
 <a href="sekolah.html"
 target="kanan"
 style="color:#ffffff; text-decoration:none; font-weight:600; font-size:20px;"
-onClick="this.style.color='yellow'; setTimeout(() => this.style.color='white', 500);">
+onclick="this.style.color='yellow'; setTimeout(function(){this.style.color='white';}.bind(this),500);">
 Daftar Sekolah
 </a>
 </li>
@@ -127,7 +127,7 @@ Daftar Sekolah
 <a href="industry.html"
 target="kanan"
 style="color:#ffffff; text-decoration:none; font-weight:600; font-size:20px;"
-onClick="this.style.color='yellow'; setTimeout(() => this.style.color='white', 500);">
+onclick="this.style.color='yellow'; setTimeout(function(){this.style.color='white';}.bind(this),500);">
 Daftar Industri
 </a>
 </li>
@@ -137,7 +137,7 @@ Daftar Industri
 <a href="formktp.html"
 target="kanan"
 style="color:#ffffff; text-decoration:none; font-weight:600; font-size:20px;"
-onClick="this.style.color='yellow'; setTimeout(() => this.style.color='white', 500);">
+onclick="this.style.color='yellow'; setTimeout(function(){this.style.color='white';}.bind(this),500);">
 Formulir Pendaftaran KTP
 </a>
 </li>
@@ -156,8 +156,7 @@ text-decoration:none;
 border-radius:8px; 
 font-weight:bold; 
 box-shadow:2px 2px 5px black;" 
-onClick="this.style.color='yellow'; 
-setTimeout(() => this.style.color='white', 500);"> 
+onclick="this.style.color='yellow'; setTimeout(function(){this.style.color='white';}.bind(this),500);">
 BACK TO HOME
 </a>
 
