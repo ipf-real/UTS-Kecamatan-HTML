@@ -107,7 +107,7 @@ Potensi Ekonomi
 <a href="wisata.html"
 target="kanan"
 style="color:#ffffff; text-decoration:none; font-weight:600; font-size:20px;"
-onClick="this.style.color='yellow'; setTimeout(() => this.style.color='white', 500);">
+onclick="this.style.color='yellow'; setTimeout(function(){this.style.color='white';}.bind(this),500);">
 Potensi Pariwisata
 </a>
 </li>
