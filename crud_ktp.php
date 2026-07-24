@@ -19,6 +19,49 @@ function cekPrepare($stmt, $koneksi) {
     }
 }
 
+// ---------------------------------------------------------
+// Helper: proses upload foto. Mengembalikan nama file baru,
+// atau null kalau user tidak memilih file (dipakai saat edit
+// supaya foto lama tidak hilang jika tidak diganti).
+// ---------------------------------------------------------
+$folder_upload = "uploads/";
+if (!is_dir($folder_upload)) {
+    mkdir($folder_upload, 0755, true);
+}
+
+function uploadFoto($folder_upload) {
+    if (!isset($_FILES['foto']) || $_FILES['foto']['error'] === UPLOAD_ERR_NO_FILE) {
+        return null; // user tidak upload file baru
+    }
+
+    if ($_FILES['foto']['error'] !== UPLOAD_ERR_OK) {
+        return ['error' => 'Terjadi kesalahan saat upload foto.'];
+    }
+
+    $ekstensiDiizinkan = ['jpg', 'jpeg', 'png'];
+    $ekstensi = strtolower(pathinfo($_FILES['foto']['name'], PATHINFO_EXTENSION));
+
+    if (!in_array($ekstensi, $ekstensiDiizinkan)) {
+        return ['error' => 'Format foto harus JPG atau PNG.'];
+    }
+
+    if ($_FILES['foto']['size'] > 2 * 1024 * 1024) {
+        return ['error' => 'Ukuran foto maksimal 2MB.'];
+    }
+
+    $namaFile = 'ktp_' . time() . '_' . uniqid() . '.' . $ekstensi;
+    $tujuan = $folder_upload . $namaFile;
+
+    if (!move_uploaded_file($_FILES['foto']['tmp_name'], $tujuan)) {
+        return ['error' => 'Gagal menyimpan file foto ke server.'];
+    }
+
+    return ['nama' => $namaFile];
+}
+
+// ---------------------------------------------------------
+// TAMBAH DATA
+// ---------------------------------------------------------
 if (isset($_POST['tambah'])) {
     $provinsi     = trim($_POST['provinsi']);
     $kabupaten    = trim($_POST['kabupaten']);
@@ -36,20 +79,31 @@ if (isset($_POST['tambah'])) {
     $pekerjaan    = trim($_POST['pekerjaan']);
     $status_kawin = trim($_POST['status_kawin']);
 
-    $query = "INSERT INTO ktp (provinsi,kabupaten,kecamatan,desa,permohonan,nama,no_kk,nik,ttl,jk,alamat,rt_rw,agama,pekerjaan,status_kawin)
-              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-    $stmt = mysqli_prepare($koneksi, $query);
-    cekPrepare($stmt, $koneksi);
-    mysqli_stmt_bind_param(
-        $stmt,"sssssssssssssss",
-        $provinsi,$kabupaten,$kecamatan,$desa,$permohonan,$nama,$no_kk,$nik,$ttl,$jk,$alamat,$rt_rw,$agama_post,$pekerjaan,$status_kawin
-    );
+    $hasilUpload = uploadFoto($folder_upload);
 
-    $pesan = mysqli_stmt_execute($stmt)
-        ? "Data berhasil ditambahkan."
-        : "Gagal menambahkan data.";
+    if (is_array($hasilUpload) && isset($hasilUpload['error'])) {
+        $pesan = $hasilUpload['error'];
+    } else {
+        $foto = $hasilUpload ? $hasilUpload['nama'] : null;
+
+        $query = "INSERT INTO ktp (provinsi,kabupaten,kecamatan,desa,permohonan,nama,no_kk,nik,ttl,jk,alamat,rt_rw,agama,pekerjaan,status_kawin,foto)
+                  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        $stmt = mysqli_prepare($koneksi, $query);
+        cekPrepare($stmt, $koneksi);
+        mysqli_stmt_bind_param(
+            $stmt, "ssssssssssssssss",
+            $provinsi,$kabupaten,$kecamatan,$desa,$permohonan,$nama,$no_kk,$nik,$ttl,$jk,$alamat,$rt_rw,$agama_post,$pekerjaan,$status_kawin,$foto
+        );
+
+        $pesan = mysqli_stmt_execute($stmt)
+            ? "Data berhasil ditambahkan."
+            : "Gagal menambahkan data.";
+    }
 }
 
+// ---------------------------------------------------------
+// SIMPAN EDIT
+// ---------------------------------------------------------
 if (isset($_POST['simpan_edit'])) {
     $id           = $_POST['id'];
     $provinsi     = trim($_POST['provinsi']);
@@ -68,21 +122,64 @@ if (isset($_POST['simpan_edit'])) {
     $pekerjaan    = trim($_POST['pekerjaan']);
     $status_kawin = trim($_POST['status_kawin']);
 
-    $query = "UPDATE ktp SET provinsi=?,kabupaten=?,kecamatan=?,desa=?,permohonan=?,nama=?,no_kk=?,nik=?,ttl=?,jk=?,alamat=?,rt_rw=?,agama=?,pekerjaan=?,status_kawin=? WHERE id=?";
-    $stmt = mysqli_prepare($koneksi, $query);
-    cekPrepare($stmt, $koneksi);
-    mysqli_stmt_bind_param(
-        $stmt,"sssssssssssssssi",
-        $provinsi,$kabupaten,$kecamatan,$desa,$permohonan,$nama,$no_kk,$nik,$ttl,$jk,$alamat,$rt_rw,$agama_post,$pekerjaan,$status_kawin,$id
-    );
+    $hasilUpload = uploadFoto($folder_upload);
 
-    $pesan = mysqli_stmt_execute($stmt)
-        ? "Data berhasil diperbarui."
-        : "Gagal memperbarui data.";
+    if (is_array($hasilUpload) && isset($hasilUpload['error'])) {
+        $pesan = $hasilUpload['error'];
+    } else {
+        if ($hasilUpload) {
+            // ada foto baru -> hapus foto lama, pakai foto baru
+            $fotoBaru = $hasilUpload['nama'];
+
+            $stmtLama = mysqli_prepare($koneksi, "SELECT foto FROM ktp WHERE id=?");
+            mysqli_stmt_bind_param($stmtLama, "i", $id);
+            mysqli_stmt_execute($stmtLama);
+            $hasilLama = mysqli_stmt_get_result($stmtLama);
+            $rowLama = mysqli_fetch_assoc($hasilLama);
+
+            if ($rowLama && !empty($rowLama['foto']) && file_exists($folder_upload . $rowLama['foto'])) {
+                unlink($folder_upload . $rowLama['foto']);
+            }
+
+            $query = "UPDATE ktp SET provinsi=?,kabupaten=?,kecamatan=?,desa=?,permohonan=?,nama=?,no_kk=?,nik=?,ttl=?,jk=?,alamat=?,rt_rw=?,agama=?,pekerjaan=?,status_kawin=?,foto=? WHERE id=?";
+            $stmt = mysqli_prepare($koneksi, $query);
+            cekPrepare($stmt, $koneksi);
+            mysqli_stmt_bind_param(
+                $stmt, "ssssssssssssssssi",
+                $provinsi,$kabupaten,$kecamatan,$desa,$permohonan,$nama,$no_kk,$nik,$ttl,$jk,$alamat,$rt_rw,$agama_post,$pekerjaan,$status_kawin,$fotoBaru,$id
+            );
+        } else {
+            // tidak ada foto baru -> foto lama dipertahankan
+            $query = "UPDATE ktp SET provinsi=?,kabupaten=?,kecamatan=?,desa=?,permohonan=?,nama=?,no_kk=?,nik=?,ttl=?,jk=?,alamat=?,rt_rw=?,agama=?,pekerjaan=?,status_kawin=? WHERE id=?";
+            $stmt = mysqli_prepare($koneksi, $query);
+            cekPrepare($stmt, $koneksi);
+            mysqli_stmt_bind_param(
+                $stmt, "sssssssssssssssi",
+                $provinsi,$kabupaten,$kecamatan,$desa,$permohonan,$nama,$no_kk,$nik,$ttl,$jk,$alamat,$rt_rw,$agama_post,$pekerjaan,$status_kawin,$id
+            );
+        }
+
+        $pesan = mysqli_stmt_execute($stmt)
+            ? "Data berhasil diperbarui."
+            : "Gagal memperbarui data.";
+    }
 }
 
+// ---------------------------------------------------------
+// HAPUS DATA (+ hapus file foto)
+// ---------------------------------------------------------
 if (isset($_GET['hapus'])) {
     $id = $_GET['hapus'];
+
+    $stmtCek = mysqli_prepare($koneksi, "SELECT foto FROM ktp WHERE id=?");
+    mysqli_stmt_bind_param($stmtCek, "i", $id);
+    mysqli_stmt_execute($stmtCek);
+    $hasilCek = mysqli_stmt_get_result($stmtCek);
+    $rowCek = mysqli_fetch_assoc($hasilCek);
+
+    if ($rowCek && !empty($rowCek['foto']) && file_exists($folder_upload . $rowCek['foto'])) {
+        unlink($folder_upload . $rowCek['foto']);
+    }
 
     $stmt = mysqli_prepare($koneksi, "DELETE FROM ktp WHERE id=?");
     cekPrepare($stmt, $koneksi);
@@ -215,7 +312,8 @@ padding:12px 30px;
 border:none;
 border-radius:8px;
 cursor:pointer;
-font-size:13px;
+font-size:15px;
+font-weight:600;
 transition:.3s;
 margin-top:20px;
 }
@@ -240,10 +338,9 @@ padding:14px;
 }
 
 td{
-padding:12px 12px 12px 14px;
+padding:10px;
 font-size:13px;
-border-bottom:1px solid #ddd;
-;
+border-bottom:1px solid #ddd; 
 }
 
 tbody tr:nth-child(even){
@@ -265,6 +362,8 @@ color:white;
 .badge-penggantian{ background:#ffc107; color:#000; }
 .badge-belumkawin{ background:#0d6efd; }
 .badge-kawin{ background:#6f42c1; }
+.badge-cerdup{ background:#e97502; }
+.badge-cermat{ background:#e90202; }
 
 .btn-edit,
 .btn-hapus{
@@ -305,6 +404,59 @@ align-items:center;
 gap:8px;
 }
 
+/* ---- Tambahan untuk foto ---- */
+.foto-wrapper{
+display:flex;
+align-items:flex-start;
+gap:15px;
+flex-wrap:wrap;
+}
+
+.foto-input{
+flex:1;
+min-width:200px;
+}
+
+.foto-preview{
+width:100px;
+height:125px;
+border:2px dashed #bbb;
+border-radius:8px;
+display:flex;
+align-items:center;
+justify-content:center;
+overflow:hidden;
+background:#f9f9f9;
+flex-shrink:0;
+}
+
+.foto-preview img{
+width:100%;
+height:100%;
+object-fit:cover;
+}
+
+.foto-preview span{
+font-size:11px;
+color:#999;
+text-align:center;
+padding:0 6px;
+}
+
+.foto-hint{
+font-size:12px;
+color:gray;
+margin-top:6px;
+}
+
+.foto-thumb{
+width:45px;
+height:55px;
+object-fit:cover;
+border-radius:4px;
+border:1px solid #ddd;
+}
+
 @media(max-width:600px){
 .container{ width:98%; }
 .form-grid{ grid-template-columns:1fr; }
@@ -343,7 +495,7 @@ Kecamatan Jalancagak, Kab.Subang, Jawa Barat
 
 <?php if($pesan!=""){ echo "<div class='pesan'>$pesan</div>"; } ?>
 
-<form method="POST">
+<form method="POST" enctype="multipart/form-data">
 
 <?php if($data_edit){ ?>
 <input type="hidden" name="id" value="<?php echo $data_edit['id']; ?>">
@@ -449,6 +601,29 @@ foreach($daftar_agama as $a){
 </select>
 </div>
 
+<div class="form-group">
+<label>Pas Foto</label>
+<div class="foto-wrapper">
+
+<div class="foto-input">
+<input type="file" name="foto" id="foto" accept="image/jpeg, image/jpg, image/png" onchange="previewFoto(event)" <?php echo $data_edit ? '' : 'required'; ?>>
+<p class="foto-hint">
+Format JPG/PNG, maksimal 2MB.
+<?php echo $data_edit ? 'Kosongkan jika tidak ingin mengganti foto.' : ''; ?>
+</p>
+</div>
+
+<div class="foto-preview" id="fotoPreview">
+<?php if ($data_edit && !empty($data_edit['foto']) && file_exists($folder_upload . $data_edit['foto'])): ?>
+<img src="<?php echo $folder_upload . htmlspecialchars($data_edit['foto']); ?>" alt="Foto saat ini">
+<?php else: ?>
+<span>Preview foto</span>
+<?php endif; ?>
+</div>
+
+</div>
+</div>
+
 </div>
 
 <?php if($data_edit){ ?>
@@ -471,6 +646,7 @@ foreach($daftar_agama as $a){
 <thead>
 <tr>
 <th>ID</th>
+<th>Foto</th>
 <th>Nama</th>
 <th>NIK</th>
 <th>Desa</th>
@@ -484,6 +660,13 @@ foreach($daftar_agama as $a){
 <?php while($row = mysqli_fetch_assoc($data_ktp)){ ?>
 <tr>
 <td align="center"><?php echo $row['id']; ?></td>
+<td align="center">
+<?php if (!empty($row['foto']) && file_exists($folder_upload . $row['foto'])): ?>
+<img class="foto-thumb" src="<?php echo $folder_upload . htmlspecialchars($row['foto']); ?>" alt="Foto">
+<?php else: ?>
+-
+<?php endif; ?>
+</td>
 <td><?php echo htmlspecialchars($row['nama']); ?></td>
 <td><?php echo htmlspecialchars($row['nik']); ?></td>
 <td><?php echo htmlspecialchars($row['desa']); ?></td>
@@ -497,8 +680,12 @@ foreach($daftar_agama as $a){
 <td align="center">
 <?php if($row['status_kawin']=="Belum Kawin"){ ?>
 <span class="badge badge-belumkawin">BELUM KAWIN</span>
-<?php } else { ?>
+<?php } elseif($row['status_kawin']=="Kawin"){ ?>
 <span class="badge badge-kawin">KAWIN</span>
+<?php } elseif($row['status_kawin']=="Cerai Hidup"){ ?>
+<span class="badge badge-cerdup">CERAI HIDUP</span>
+<?php } elseif($row['status_kawin']=="Cerai Mati"){ ?>
+<span class="badge badge-cermat">CERAI MATI</span>
 <?php } ?>
 </td>
 <td align="center">
@@ -525,8 +712,8 @@ var filter=input.value.toUpperCase();
 var table=document.getElementById("tabelKtp");
 var tr=table.getElementsByTagName("tr");
 for(var i=1;i<tr.length;i++){
-    var tdNama=tr[i].getElementsByTagName("td")[1];
-    var tdNik=tr[i].getElementsByTagName("td")[2];
+    var tdNama=tr[i].getElementsByTagName("td")[2];
+    var tdNik=tr[i].getElementsByTagName("td")[3];
     if(tdNama){
         var nama=(tdNama.textContent||tdNama.innerText).toUpperCase();
         var nik=(tdNik.textContent||tdNik.innerText).toUpperCase();
@@ -537,6 +724,25 @@ for(var i=1;i<tr.length;i++){
         }
     }
 }
+}
+
+function previewFoto(event){
+var file=event.target.files[0];
+var previewBox=document.getElementById('fotoPreview');
+if(!file){ return; }
+
+var maxSize=2*1024*1024;
+if(file.size>maxSize){
+    alert('Ukuran foto maksimal 2MB. Silakan pilih foto lain.');
+    event.target.value='';
+    return;
+}
+
+var reader=new FileReader();
+reader.onload=function(e){
+    previewBox.innerHTML='<img src="'+e.target.result+'" alt="Preview Foto">';
+};
+reader.readAsDataURL(file);
 }
 </script>
 
